@@ -38,8 +38,20 @@ jobs:
 
       - name: Sync fork
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: gh repo sync troycdc/cdcx-cli --source crypto-com/cdcx-cli --branch main
+
+      - name: Create branch on fork
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+        run: |
+          BRANCH="chore/bump-v${{ inputs.version }}"
+          BASE_SHA=$(gh api "/repos/troycdc/cdcx-cli/git/ref/heads/main" --jq '.object.sha')
+          gh api "/repos/troycdc/cdcx-cli/git/refs" \
+            -f "ref=refs/heads/${BRANCH}" \
+            -f "sha=${BASE_SHA}" 2>/dev/null || \
+          gh api "/repos/troycdc/cdcx-cli/git/refs/heads/${BRANCH}" \
+            -X PATCH -f "sha=${BASE_SHA}" -F "force=true"
 
       - name: Create signed commit on fork
         uses: planetscale/ghcommit-action@v0.2.20
@@ -49,11 +61,11 @@ jobs:
           branch: "chore/bump-v${{ inputs.version }}"
           file_pattern: "Cargo.toml Cargo.lock package.json"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
 
       - name: Open PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           gh pr create \
             --repo crypto-com/cdcx-cli \
