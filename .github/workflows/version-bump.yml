@@ -36,12 +36,28 @@ jobs:
           jq --arg v "${{ inputs.version }}" '.version = $v' package.json > package.json.tmp
           mv package.json.tmp package.json
 
-      - name: Commit, tag, and push
+      - name: Sync fork
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh repo sync troycdc/cdcx-cli --source crypto-com/cdcx-cli --branch main
+
+      - name: Create signed commit on fork
+        uses: planetscale/ghcommit-action@v0.2.20
+        with:
+          commit_message: "chore: bump version to ${{ inputs.version }}"
+          repo: troycdc/cdcx-cli
+          branch: "chore/bump-v${{ inputs.version }}"
+          file_pattern: "Cargo.toml Cargo.lock package.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock package.json
-          git commit -m "chore: bump version to ${{ inputs.version }}"
-          git tag "v${{ inputs.version }}"
-          git push
-          git push origin "v${{ inputs.version }}"
+          gh pr create \
+            --repo crypto-com/cdcx-cli \
+            --head "troycdc:chore/bump-v${{ inputs.version }}" \
+            --base main \
+            --title "chore: bump version to ${{ inputs.version }}" \
+            --body "Automated version bump to ${{ inputs.version }}."
